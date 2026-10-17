@@ -43,6 +43,7 @@ content.js (웹 페이지 상호작용)
 - `modules/mermaid/` - Mermaid.js SVG 렌더링
 - `modules/settings.js` - Chrome Storage 관리 (SettingsManager 클래스)
 - `libs/mermaid.min.js` - Mermaid 라이브러리 (번들 포함)
+- `libs/epub.min.js`, `libs/jszip.min.js` - EPUB 리더용 (번들 포함, 갱신: `npm run build:epub`)
 
 **스토리지:**
 - Chrome Storage API 사용 (sync: 설정, local: 메모)

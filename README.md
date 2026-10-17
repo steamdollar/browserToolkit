@@ -103,7 +103,7 @@ toolkits/
 ├── popup.html / popup.js      # 메인 UI 및 컨트롤러
 ├── background.js              # 백그라운드 서비스 워커
 ├── content.js                 # 콘텐츠 스크립트 (오버레이 등)
-├── libs/                      # 외부 라이브러리 (mermaid.min.js)
+├── libs/                      # 외부 라이브러리 (mermaid, epub.js, jszip)
 ├── modules/
 │   ├── base64/                # 인코딩/디코딩 로직 및 UI
 │   ├── http/                  # API 요청 처리
@@ -128,17 +128,16 @@ toolkits/
 마우스 휠은 한 번의 스크롤 동작(250ms 이상 멈춤으로 구분)당 한 페이지씩 넘깁니다. `Ctrl`+휠은 브라우저 확대/축소로 남겨둡니다.
 책의 내용은 외부 서버에 업로드되지 않으며, epub.js의 스크립트 실행 허용 옵션은 꺼져 있습니다.
 
-### 최초 1회 라이브러리 설치
+### 라이브러리 번들
+
+EPUB 렌더링에 필요한 JSZip 3.10.2와 epub.js 0.3.93의 `dist/*.min.js`는 `libs/`에 커밋되어 있어
+clone 후 바로 로드할 수 있습니다. 브라우저에서 CDN이나 원격 실행 코드를 가져오지 않습니다.
+버전을 올릴 때만 `package.json`을 수정한 뒤 아래 명령으로 `libs/`를 갱신하고 함께 커밋하세요.
 
 ```bash
 npm install
 npm run build:epub
 ```
-
-이후 `chrome://extensions`에서 확장을 새로고침하거나 압축 해제된 확장을 다시 로드하세요.
-EPUB 렌더링에 필요한 JSZip 3.10.2와 epub.js 0.3.93은 npm에서 설치한 뒤
-`libs/` 디렉터리에 복사됩니다. 브라우저에서 CDN이나 원격 실행 코드를 가져오지 않습니다.
-EPUB 렌더링 라이브러리 번들은 저장소에 포함하지 않으므로, 새로운 PC에서는 이 빌드 과정을 반복해야 합니다.
 DRM이 적용된 파일은 지원하지 않습니다.
 
 ### 최근 책: 파일 핸들 방식
