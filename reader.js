@@ -28,6 +28,9 @@
     closeLibrary: $('close-library'),
     recentHome: $('recent-home'),
     recentHomeList: $('recent-home-list'),
+    libraryCount: $('library-count'),
+    clearLibrary: $('clear-library'),
+    clearLibraryHome: $('clear-library-home'),
     pageNumber: $('page-number'),
     pageTotal: $('page-total'),
     goPage: $('go-page')
@@ -72,37 +75,73 @@
     }
   }
 
+  function showEmptyReader() {
+    resetBook();
+    ui.empty.hidden = false;
+    ui.title.textContent = '책을 선택하세요';
+    ui.status.textContent = 'EPUB 파일을 선택하세요.';
+    document.title = 'EPUB Reader · Dev Toolkit';
+  }
+
+  async function forgetBook(id, title) {
+    if (!window.confirm('“' + title + '”을(를) 최근 목록에서 삭제할까요?\\n원본 EPUB 파일은 삭제되지 않습니다.')) return;
+    try {
+      await window.EpubLibrary.remove(id);
+      await chrome.storage.local.remove(POSITION_PREFIX + id);
+      if (currentBookId === id) showEmptyReader();
+      await refreshRecentBooks();
+    } catch (error) {
+      console.error('최근 책 삭제 실패:', error);
+      showError('최근 목록에서 책을 삭제하지 못했습니다.');
+    }
+  }
+
+  async function clearLibrary() {
+    const entries = await window.EpubLibrary.list().catch(() => []);
+    if (!entries.length) return;
+    if (!window.confirm('최근 책 ' + entries.length + '권을 모두 목록에서 삭제할까요?\\n기존 EPUB 복사본과 위치 캐시가 삭제되지만, 원본 파일은 삭제되지 않습니다.')) return;
+    try {
+      await window.EpubLibrary.clearAll();
+      const saved = await chrome.storage.local.get(null);
+      const keys = Object.keys(saved).filter(key => key.startsWith(POSITION_PREFIX));
+      if (keys.length) await chrome.storage.local.remove(keys);
+      showEmptyReader();
+      await refreshRecentBooks();
+    } catch (error) {
+      console.error('최근 책 전체 삭제 실패:', error);
+      showError('전체 삭제 중 오류가 발생했습니다.');
+    }
+  }
+
   function renderRecentItem(item) {
+    const isLegacy = item.kind !== 'handle';
     const row = document.createElement('div');
     row.className = 'library-row';
 
     const open = document.createElement('button');
     open.type = 'button';
     open.className = 'library-open';
-    open.title = item.name;
+    open.title = isLegacy ? '원본 EPUB 파일을 다시 선택해 연결' : '원본 EPUB 파일 열기';
     const title = document.createElement('strong');
     title.textContent = item.title || item.name;
     const detail = document.createElement('small');
-    detail.textContent = item.name + ' · ' + new Date(item.openedAt).toLocaleDateString('ko-KR');
+    detail.textContent = isLegacy
+      ? '이전 저장본 · 클릭해 원본 연결'
+      : item.name + ' · ' + new Date(item.openedAt).toLocaleDateString('ko-KR');
+    if (isLegacy) detail.className = 'legacy';
     open.append(title, detail);
-    open.addEventListener('click', () => void reopenBook(item.id));
+    open.addEventListener('click', () => {
+      if (isLegacy) void chooseFile(item.id, item.name);
+      else void reopenBook(item.id);
+    });
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'library-remove';
-    remove.textContent = '×';
-    remove.title = '보관함에서 삭제';
-    remove.setAttribute('aria-label', (item.title || item.name) + ' 보관함에서 삭제');
-    remove.addEventListener('click', async () => {
-      try {
-        await window.EpubLibrary.remove(item.id);
-        await chrome.storage.local.remove(POSITION_PREFIX + item.id);
-        await refreshRecentBooks();
-      } catch (error) {
-        console.error('도서 삭제 실패:', error);
-        showError('저장된 책을 삭제하지 못했습니다.');
-      }
-    });
+    remove.textContent = '삭제';
+    remove.title = '목록에서 삭제 (원본 파일 유지)';
+    remove.setAttribute('aria-label', (item.title || item.name) + ' 최근 목록에서 삭제');
+    remove.addEventListener('click', () => void forgetBook(item.id, item.title || item.name));
     row.append(open, remove);
     return row;
   }
@@ -113,6 +152,9 @@
       ui.libraryList.replaceChildren();
       ui.recentHomeList.replaceChildren();
       ui.recentHome.hidden = entries.length === 0;
+      ui.libraryCount.textContent = entries.length + '권';
+      ui.clearLibrary.disabled = entries.length === 0;
+      ui.clearLibraryHome.disabled = entries.length === 0;
       if (!entries.length) {
         const note = document.createElement('p');
         note.className = 'library-empty';
@@ -137,19 +179,59 @@
     if (opening) return;
     try {
       const entry = await window.EpubLibrary.get(id);
-      if (!entry?.blob) {
-        showError('저장된 EPUB 파일이 없습니다.');
-        await refreshRecentBooks();
+      if (!entry?.handle) {
+        showError('이 책은 이전 저장본입니다. 목록에서 원본 EPUB 파일을 다시 연결해주세요.');
         return;
       }
-      const file = new File([entry.blob], entry.name, {
-        type: 'application/epub+zip',
-        lastModified: entry.lastModified
-      });
-      await openFile(file);
+
+      // Permissions may not survive browser restarts; ask only for read access.
+      let permission = await entry.handle.queryPermission({ mode: 'read' });
+      if (permission !== 'granted') {
+        permission = await entry.handle.requestPermission({ mode: 'read' });
+      }
+      if (permission !== 'granted') {
+        showError('파일 접근 권한이 허용되지 않았습니다. 목록의 책을 다시 선택하거나 원본을 다시 열어주세요.');
+        return;
+      }
+      const file = await entry.handle.getFile();
+      await openFile(file, { handle: entry.handle, recordId: id });
     } catch (error) {
       console.error('최근 책 열기 실패:', error);
-      showError('저장된 EPUB을 열지 못했습니다. 파일을 다시 선택해주세요.');
+      showError('원본 EPUB에 접근할 수 없습니다. 파일이 이동·삭제되었거나 권한이 해제되었을 수 있습니다.');
+    }
+  }
+
+  async function chooseFile(recordId = null, expectedName = null) {
+    if (opening) return;
+    if (typeof window.showOpenFilePicker !== 'function') {
+      if (recordId) {
+        showError('이 브라우저는 파일 핸들을 지원하지 않아 이전 책을 연결할 수 없습니다.');
+      } else {
+        ui.input.click(); // Read once without saving a second copy.
+        showError('파일 핸들을 지원하지 않아 이번에만 읽을 수 있습니다.');
+      }
+      return;
+    }
+    try {
+      // Invoke the picker directly from the click, preserving user activation.
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{
+          description: 'EPUB 전자책',
+          accept: { 'application/epub+zip': ['.epub'] }
+        }]
+      });
+      if (!handle) return;
+      const file = await handle.getFile();
+      if (expectedName && file.name !== expectedName) {
+        showError('같은 책의 원본 파일을 선택해주세요: ' + expectedName);
+        return;
+      }
+      await openFile(file, { handle, recordId });
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error('파일 선택 실패:', error);
+      showError('파일을 열지 못했습니다. 브라우저의 파일 접근 권한을 확인해주세요.');
     }
   }
 
@@ -298,37 +380,45 @@
     }
   }
 
-  async function openFile(file) {
+  async function openFile(file, { handle = null, recordId = null } = {}) {
     if (opening) return;
     if (!file || (!file.name.toLowerCase().endsWith('.epub') && file.type !== 'application/epub+zip')) {
       showError('EPUB(.epub) 파일을 선택해주세요.');
       return;
     }
     if (typeof ePub !== 'function' || typeof JSZip === 'undefined') {
-      showError('EPUB 라이브러리가 없습니다. 저장소에서 npm install && npm run build:epub 을 실행한 뒤 확장을 새로고침하세요.');
+      showError('EPUB 라이브러리가 없습니다. npm install && npm run build:epub 후 확장 프로그램을 새로고침하세요.');
       return;
     }
 
     opening = true;
     clearError();
-    resetBook();
-    ui.status.textContent = 'EPUB을 여는 중…';
-    ui.title.textContent = file.name;
-
-    const id = window.EpubLibrary.bookId(file);
-    const key = POSITION_PREFIX + id;
-    const token = activeToken;
+    let id = recordId || window.EpubLibrary.bookId(file);
+    let changed = false;
     try {
+      if (handle) {
+        // Reopening an edited file via the picker should not create a duplicate.
+        const known = recordId ? null : await window.EpubLibrary.findByHandle(handle);
+        if (known) id = known.id;
+        const existing = await window.EpubLibrary.get(id);
+        changed = !!existing && (existing.size !== file.size || existing.lastModified !== file.lastModified);
+      }
+
+      resetBook();
+      const token = activeToken;
+      const key = POSITION_PREFIX + id;
+      currentBookId = id;
+      currentKey = key;
+      ui.status.textContent = 'EPUB을 여는 중…';
+      ui.title.textContent = file.name;
+
       const buffer = await file.arrayBuffer();
       book = ePub(buffer);
       await book.ready;
-      currentKey = key;
-      currentBookId = id;
       const metadata = await book.loaded.metadata;
       ui.title.textContent = metadata?.title || file.name;
       document.title = ui.title.textContent + ' · EPUB Reader';
 
-      // 렌더러는 컨테이너의 실제 크기를 읽으므로 숨김 해제 후 생성합니다.
       ui.empty.hidden = true;
       ui.viewer.hidden = false;
       rendition = book.renderTo(ui.viewer, {
@@ -360,11 +450,14 @@
           const page = location.start.displayed?.page;
           const total = location.start.displayed?.total;
           ui.status.textContent = page && total
-            ? `현재 장 ${page} / ${total} · 전체 위치 계산 중…` : '전체 위치 계산 중…';
+            ? `현재 장 ${page} / ${total} · 전체 위치 계산 중…`
+            : '전체 위치 계산 중…';
         }
       });
 
-      const saved = await chrome.storage.local.get(key);
+      // Positions and cached CFI indexes are invalid if the original file changed.
+      if (changed) await chrome.storage.local.remove(key).catch(console.warn);
+      const saved = changed ? {} : await chrome.storage.local.get(key);
       const cfi = saved[key];
       if (typeof cfi === 'string') {
         try { await rendition.display(cfi); }
@@ -375,14 +468,12 @@
       ui.prev.disabled = false;
       ui.next.disabled = false;
 
-      // EPUB 본문 iframe에 포커스가 있을 때도 키보드 페이지 넘김 지원
       rendition.on('keyup', (event) => {
         if (event.altKey || event.ctrlKey || event.metaKey) return;
         if (event.key === 'ArrowLeft') void rendition?.prev();
         if (event.key === 'ArrowRight') void rendition?.next();
       });
 
-      // 내비게이션 파일이 누락된 책도 열 수 있어야 합니다.
       try {
         const navigation = await book.loaded.navigation;
         addTocItems(navigation?.toc);
@@ -391,23 +482,26 @@
         console.warn('EPUB 목차 로딩 실패:', error);
       }
 
-      // Rendering must not depend on a successful disk write.
       const targetBook = book;
+      const title = ui.title.textContent;
       void (async () => {
-        try {
-          await window.EpubLibrary.save(file, ui.title.textContent);
-        } catch (error) {
-          console.warn('최근 책 파일 저장 실패:', error);
-          if (activeToken === token) showError('책은 열렸지만 보관함 저장에 실패했습니다. 저장 공간을 확인해주세요.');
+        if (handle) {
+          try {
+            await window.EpubLibrary.save(handle, file, title, id);
+          } catch (error) {
+            console.warn('EPUB 파일 핸들 저장 실패:', error);
+            if (activeToken === token) showError('책은 열렸지만 원본 참조를 저장하지 못했습니다. 저장 공간이나 권한을 확인해주세요.');
+          }
+        } else if (activeToken === token) {
+          showError('이 파일은 이번 탭에서만 열었습니다. 최근 책에 저장하려면 EPUB 열기 버튼으로 다시 선택해주세요.');
         }
         if (activeToken !== token || targetBook !== book) return;
         await refreshRecentBooks();
         await prepareLocations(targetBook, id, token);
-      })();
+      })().catch(error => console.error('EPUB 도서 후처리 실패:', error));
     } catch (error) {
       console.error('EPUB을 열 수 없습니다:', error);
-      resetBook();
-      ui.empty.hidden = false;
+      showEmptyReader();
       ui.status.textContent = 'EPUB을 열 수 없습니다.';
       showError('EPUB 파일을 읽지 못했습니다. 손상된 파일이거나 DRM이 적용된 책일 수 있습니다.');
     } finally {
@@ -424,12 +518,14 @@
     setTheme();
     setFont();
 
-    ui.choose.addEventListener('click', () => ui.input.click());
-    ui.openFirst.addEventListener('click', () => ui.input.click());
+    ui.choose.addEventListener('click', () => void chooseFile());
+    ui.openFirst.addEventListener('click', () => void chooseFile());
+    ui.clearLibrary.addEventListener('click', () => void clearLibrary());
+    ui.clearLibraryHome.addEventListener('click', () => void clearLibrary());
     ui.input.addEventListener('change', () => {
       const file = ui.input.files?.[0];
       ui.input.value = '';
-      if (file) void openFile(file);
+      if (file) void openFile(file); // Fallback is temporary, never saved as Blob.
     });
     ui.prev.addEventListener('click', () => rendition?.prev().catch(console.error));
     ui.next.addEventListener('click', () => rendition?.next().catch(console.error));
@@ -487,7 +583,26 @@
       event.preventDefault();
       document.body.classList.remove('drop-target');
       const file = event.dataTransfer?.files?.[0];
-      if (file) void openFile(file);
+      const item = Array.from(event.dataTransfer?.items || []).find(candidate => candidate.kind === 'file');
+      // Must invoke getAsFileSystemHandle synchronously within the drop event.
+      let handlePromise;
+      try { handlePromise = item?.getAsFileSystemHandle?.(); }
+      catch (error) { console.warn('드래그 핸들 취득 실패:', error); }
+      if (handlePromise) {
+        void Promise.resolve(handlePromise)
+          .then(async handle => {
+            if (handle?.kind === 'file') {
+              await openFile(await handle.getFile(), { handle });
+            } else if (file) {
+              await openFile(file);
+            }
+          }).catch(error => {
+            console.error('EPUB 드롭 실패:', error);
+            showError('파일을 읽지 못했습니다. EPUB 열기 버튼으로 다시 선택해주세요.');
+          });
+      } else if (file) {
+        void openFile(file);
+      }
     });
 
     if (typeof ePub !== 'function' || typeof JSZip === 'undefined') {
