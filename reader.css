@@ -52,17 +52,24 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .error { position: absolute; z-index: 2; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(90%, 560px); padding: 12px; color: var(--alert-ink); background: var(--alert-bg); border-radius: 7px; }
 .footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 20px; border-top: 1px solid var(--line); background: var(--surface); }
 #reading-status { min-width: 0; text-align: center; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* Recent files are in extension-origin IndexedDB, never fetched from a server. */
+/* Recent records contain file handles only (except for explicitly retained legacy copies). */
 .sidebar-note { margin: 10px 14px; font-size: 12px; color: var(--muted); }
 .library-list { padding: 8px; }
 .library-row { display: flex; gap: 5px; margin: 3px 0 8px; align-items: center; }
 .library-open { min-width: 0; flex: 1; text-align: left; white-space: normal; word-break: break-word; }
 .library-open strong { display: block; font-size: 13px; }
 .library-open small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
-.library-remove { color: var(--muted); }
+.library-remove { color: var(--muted); font-size: 12px; padding: 7px; }
+.library-actions, .recent-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; }
+.library-actions { border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.recent-heading h2 { margin: 0; font-size: 15px; }
+button.danger { color: var(--alert-ink); border-color: var(--alert-ink); background: var(--alert-bg); font-size: 12px; padding: 5px 9px; }
+.library-open small.legacy { color: var(--alert-ink); }
+.library-row .library-open { padding: 8px; }
+.library-list .library-row:not(:last-child) { border-bottom: 1px solid var(--line); }
 .library-empty { color: var(--muted); font-size: 12px; padding: 10px; text-align: left; }
 .recent-home { max-height: 280px; overflow: auto; margin-top: 25px; text-align: left; border-top: 1px solid var(--line); }
-.recent-home h2 { font-size: 15px; margin: 14px 8px 4px; }
+.recent-home h2 { font-size: 15px; margin: 0; }
 .page-jump { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 .page-jump label, #page-total { color: var(--muted); font-size: 12px; }
 #page-number { width: 75px; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 7px; font: inherit; }
