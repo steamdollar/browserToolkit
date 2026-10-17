@@ -12,6 +12,11 @@ import { calculateTPSL, formatPrice, validateInputs } from './modules/leverage/i
 import { translateText, detectLanguage, getTargetLanguage } from './modules/translation/index.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // EPUB은 읽기 화면이 넓어야 하므로 팝업 대신 별도 확장 프로그램 탭으로 엽니다.
+  document.getElementById('openEpubReader')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('reader.html') });
+  });
+
   // 설정 관리자 초기화
   const settingsManager = new SettingsManager();
 
