@@ -77,6 +77,7 @@
 
   function showEmptyReader() {
     resetBook();
+    clearError();
     ui.empty.hidden = false;
     ui.title.textContent = '책을 선택하세요';
     ui.status.textContent = 'EPUB 파일을 선택하세요.';
@@ -84,7 +85,7 @@
   }
 
   async function forgetBook(id, title) {
-    if (!window.confirm('“' + title + '”을(를) 최근 목록에서 삭제할까요?\\n원본 EPUB 파일은 삭제되지 않습니다.')) return;
+    if (!window.confirm('“' + title + '”을(를) 최근 목록에서 삭제할까요?\n원본 EPUB 파일은 삭제되지 않습니다.')) return;
     try {
       await window.EpubLibrary.remove(id);
       await chrome.storage.local.remove(POSITION_PREFIX + id);
@@ -99,7 +100,7 @@
   async function clearLibrary() {
     const entries = await window.EpubLibrary.list().catch(() => []);
     if (!entries.length) return;
-    if (!window.confirm('최근 책 ' + entries.length + '권을 모두 목록에서 삭제할까요?\\n기존 EPUB 복사본과 위치 캐시가 삭제되지만, 원본 파일은 삭제되지 않습니다.')) return;
+    if (!window.confirm('최근 책 ' + entries.length + '권을 모두 목록에서 삭제할까요?\n기존 EPUB 복사본과 위치 캐시가 삭제되지만, 원본 파일은 삭제되지 않습니다.')) return;
     try {
       await window.EpubLibrary.clearAll();
       const saved = await chrome.storage.local.get(null);
