@@ -59,7 +59,12 @@
     for (const item of recents) {
       if (item.kind !== 'handle') continue;
       const record = await get(item.id);
-      if (record?.handle && await handle.isSameEntry(record.handle)) return record;
+      if (!record?.handle) continue;
+      try {
+        if (await handle.isSameEntry(record.handle)) return record;
+      } catch (error) {
+        console.warn('기존 파일 핸들 비교 실패:', error);
+      }
     }
     return null;
   }
