@@ -114,7 +114,7 @@ async function ensureContentScript(tabId) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ['libs/mermaid.min.js', 'content.js']
+        files: ['content.js']
       });
       return true;
     } catch (injectError) {
@@ -170,6 +170,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else {
           chrome.tabs.sendMessage(sender.tab.id, { action: "show_error", text: "Mermaid 코드가 아닙니다" })
             .catch(err => console.error('에러 메시지 표시 실패:', err));
+        }
+        break;
+
+      // Mermaid 라이브러리 지연 주입: content script와 같은 isolated world에 넣어 `mermaid` 전역을 공유한다
+      case "inject_mermaid":
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: sender.tab.id, frameIds: [sender.frameId] },
+            files: ['libs/mermaid.min.js']
+          });
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('Mermaid 라이브러리 주입 실패:', error);
+          sendResponse({ success: false, error: error.message });
         }
         break;
 

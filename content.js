@@ -581,6 +581,17 @@ function processSvgElement(svgElement, chartContainer) {
   chartContainer.appendChild(style);
 }
 
+// Mermaid 라이브러리(약 2.7MB)는 모든 페이지에 넣지 않고 오버레이를 처음 열 때 background에 주입을 요청한다.
+// 실패하면 renderMermaidToDiv가 "라이브러리를 찾을 수 없습니다"를 오버레이에 표시한다.
+async function ensureMermaidLoaded() {
+  if (typeof mermaid !== 'undefined') return;
+  try {
+    await chrome.runtime.sendMessage({ action: "inject_mermaid" });
+  } catch (error) {
+    console.error('Mermaid 라이브러리 주입 요청 실패:', error);
+  }
+}
+
 // Mermaid 차트 렌더링
 function renderMermaidToDiv(mermaidCode, chartDiv, chartContainer) {
   if (typeof mermaid === 'undefined') {
@@ -678,6 +689,7 @@ async function showMermaidOverlay(mermaidCode) {
   const chartDiv = createChartDiv();
 
   // Mermaid 렌더링
+  await ensureMermaidLoaded();
   renderMermaidToDiv(mermaidCode, chartDiv, chartContainer);
 
   // 닫기 버튼

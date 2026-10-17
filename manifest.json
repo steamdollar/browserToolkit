@@ -23,7 +23,6 @@
         "<all_urls>"
       ],
       "js": [
-        "libs/mermaid.min.js",
         "content.js"
       ]
     }
