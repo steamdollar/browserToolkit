@@ -300,6 +300,8 @@
         }
       }
       if (targetBook.locations.length() === 0) {
+        // epub.js idles 100ms per section by default (300 sections → 30s+); it still yields via rAF.
+        targetBook.locations.pause = 0;
         await targetBook.locations.generate(1600);
         if (!valid()) return;
         // Compute once, reuse on subsequent opens. Failure to cache is non-fatal.
@@ -366,6 +368,13 @@
       rendition = null;
     }
     if (book) {
+      // epub.js 0.3.93 Archive.destroy revokes cache keys (paths), not the blob URLs; release
+      // image/font/CSS blobs here so switching books does not accumulate memory.
+      const blobUrls = [
+        ...Object.values(book.archive?.urlCache || {}),
+        ...(book.resources?.replacementUrls || [])
+      ];
+      for (const url of blobUrls) URL.revokeObjectURL(url);
       try { book.destroy(); } catch (error) { console.warn(error); }
       book = null;
     }
@@ -430,7 +439,9 @@
       ui.title.textContent = file.name;
 
       const buffer = await file.arrayBuffer();
-      book = ePub(buffer);
+      // ePub(buffer) swallows open failures and book.ready never settles; open() rejects instead.
+      book = ePub();
+      await book.open(buffer, 'binary');
       await book.ready;
       const metadata = await book.loaded.metadata;
       ui.title.textContent = metadata?.title || file.name;
@@ -582,7 +593,8 @@
 
     document.addEventListener('keydown', (event) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName)) return;
+      // Buttons stay eligible so arrow keys keep working after clicking "다음 →".
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
       if (event.key === 'ArrowLeft' && rendition) {
         event.preventDefault();
         void rendition.prev();
