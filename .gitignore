@@ -1,3 +1,7 @@
 *.txt
 node_modules/
 _metadata/
+
+# Generated locally from pinned npm dependencies
+libs/epub.min.js
+libs/jszip.min.js
