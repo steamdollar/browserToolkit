@@ -398,11 +398,16 @@
     let changed = false;
     try {
       if (handle) {
-        // Reopening an edited file via the picker should not create a duplicate.
-        const known = recordId ? null : await window.EpubLibrary.findByHandle(handle);
-        if (known) id = known.id;
-        const existing = await window.EpubLibrary.get(id);
-        changed = !!existing && (existing.size !== file.size || existing.lastModified !== file.lastModified);
+        try {
+          // Reopening an edited file via the picker should not create a duplicate.
+          const known = recordId ? null : await window.EpubLibrary.findByHandle(handle);
+          if (known) id = known.id;
+          const existing = await window.EpubLibrary.get(id);
+          changed = !!existing && (existing.size !== file.size || existing.lastModified !== file.lastModified);
+        } catch (error) {
+          // A broken recent-book index must not prevent reading a valid EPUB.
+          console.warn('최근 책 메타데이터 조회 실패:', error);
+        }
       }
 
       resetBook();
