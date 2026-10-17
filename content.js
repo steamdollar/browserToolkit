@@ -641,22 +641,28 @@ function downloadSvg(chartDiv) {
   }
 }
 
-// 오버레이 이벤트 설정
-function setupOverlayEvents(overlay, chartContainer) {
-  // 오버레이 바깥 클릭 시 닫기
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
-    }
-  });
+// 현재 열린 Mermaid 오버레이의 닫기 함수.
+// 모든 닫기 경로(ESC·닫기 버튼·바깥 클릭·새 오버레이로 교체)가 이 함수를 거쳐야
+// document의 ESC keydown 리스너가 제거된 오버레이 DOM을 붙잡고 남지 않는다.
+let closeMermaidOverlay = null;
 
-  // ESC 키로 닫기
+// 오버레이 이벤트 설정
+function setupOverlayEvents(overlay, chartContainer, closeButton) {
   const handleEscape = (e) => {
-    if (e.key === 'Escape') {
-      overlay.remove();
-      document.removeEventListener('keydown', handleEscape);
-    }
+    if (e.key === 'Escape') closeOverlay();
   };
+  const closeOverlay = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', handleEscape);
+    if (closeMermaidOverlay === closeOverlay) closeMermaidOverlay = null;
+  };
+  closeMermaidOverlay = closeOverlay;
+
+  // 오버레이 바깥 클릭, 닫기 버튼, ESC 키로 닫기
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeOverlay();
+  });
+  closeButton.addEventListener('click', closeOverlay);
   document.addEventListener('keydown', handleEscape);
 
   // 마우스 휠로 가로 스크롤 가능하게 처리 (세로 스크롤이 없을 때만)
@@ -677,11 +683,9 @@ function setupOverlayEvents(overlay, chartContainer) {
 
 // 머메이드 차트 오버레이 표시 함수 (메인)
 async function showMermaidOverlay(mermaidCode) {
-  // 기존 오버레이 제거
-  const oldOverlay = document.getElementById('mermaid-chart-overlay');
-  if (oldOverlay) {
-    oldOverlay.remove();
-  }
+  // 기존 오버레이 제거 (리스너까지 정리). getElementById는 이전 content script 인스턴스가 남긴 오버레이용
+  closeMermaidOverlay?.();
+  document.getElementById('mermaid-chart-overlay')?.remove();
 
   // 요소 생성
   const overlay = createOverlayElement();
@@ -709,7 +713,6 @@ async function showMermaidOverlay(mermaidCode) {
       justifyContent: 'center'
     }
   });
-  closeButton.addEventListener('click', () => overlay.remove());
 
   // 다운로드 버튼
   const downloadButton = createOverlayButton({
@@ -734,5 +737,5 @@ async function showMermaidOverlay(mermaidCode) {
   document.body.appendChild(overlay);
 
   // 이벤트 설정
-  setupOverlayEvents(overlay, chartContainer);
+  setupOverlayEvents(overlay, chartContainer, closeButton);
 }
