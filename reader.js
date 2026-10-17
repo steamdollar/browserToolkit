@@ -48,6 +48,17 @@
   let currentBookId = null;
   let locationsReady = false;
   let activeToken = 0;
+  const wheelPager = window.EpubWheelPager.create();
+
+  // Wheel down/right → next page, up/left → previous. Ctrl+wheel stays browser zoom.
+  function handleWheel(event) {
+    if (!rendition || event.ctrlKey) return;
+    event.preventDefault();
+    // Parent-page clock: iframe events carry timeStamps from a different time origin.
+    const direction = wheelPager(event, performance.now());
+    if (direction === 'next') rendition.next().catch(console.error);
+    else if (direction === 'prev') rendition.prev().catch(console.error);
+  }
 
   function showError(message) {
     ui.error.textContent = message;
@@ -444,6 +455,11 @@
       });
       setTheme();
       setFont();
+      // epub.js does not forward wheel events out of its section iframes, so attach per section.
+      // passive:false is required: Chrome treats document-level wheel listeners as passive.
+      rendition.hooks.content.register((contents) => {
+        contents.document.addEventListener('wheel', handleWheel, { passive: false });
+      });
 
       rendition.on('relocated', (location) => {
         if (currentKey !== key || !location?.start?.cfi) return;
@@ -535,6 +551,8 @@
     });
     ui.prev.addEventListener('click', () => rendition?.prev().catch(console.error));
     ui.next.addEventListener('click', () => rendition?.next().catch(console.error));
+    // Covers the viewer padding outside the book iframe.
+    ui.viewer.addEventListener('wheel', handleWheel, { passive: false });
     ui.tocButton.addEventListener('click', () => toggleToc(ui.tocPanel.hidden));
     ui.closeToc.addEventListener('click', () => toggleToc(false));
     ui.libraryButton.addEventListener('click', () => toggleLibrary(ui.libraryPanel.hidden));
