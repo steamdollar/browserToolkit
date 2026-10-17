@@ -126,6 +126,13 @@ async function ensureContentScript(tabId) {
 
 // 단축키 명령어 리스너
 chrome.commands.onCommand.addListener(async (command) => {
+  // EPUB 리더는 웹 페이지와 무관한 확장 탭이므로 팝업 버튼처럼 On/Off·content script 확인 없이 연다.
+  // 기본 단축키는 4개 제한이 다 차서 지정하지 않음 → chrome://extensions/shortcuts 에서 직접 지정
+  if (command === "open-epub-reader") {
+    chrome.tabs.create({ url: chrome.runtime.getURL('reader.html') });
+    return;
+  }
+
   const result = await getSync(['isEnabled']);
   if (!result.isEnabled) return;
 

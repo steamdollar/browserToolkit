@@ -70,10 +70,13 @@ content.js (웹 페이지 상호작용)
 | Base64 디코딩 | `Alt+Shift+D` |
 | Mermaid 오버레이 | `Alt+Q` |
 | 페이지 메모 저장 | `Alt+Shift+S` |
+| EPUB 리더 열기 | 기본키 없음 (직접 지정, 권장 `Alt+Shift+E`) |
 | 팝업 폼 저장 | `Ctrl+S` |
 | 팝업 내 실행 | `Ctrl+Enter` |
 
 변경: `chrome://extensions/shortcuts`
+
+`suggested_key`는 최대 4개, `Ctrl+Alt` 조합 불가 (위반 시 확장 로드 실패). 4칸이 차 있으므로 새 명령은 기본키 없이 추가한다.
 
 ## 디버깅
 
