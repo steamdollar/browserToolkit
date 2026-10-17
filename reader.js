@@ -133,6 +133,9 @@
       ui.title.textContent = metadata?.title || file.name;
       document.title = ui.title.textContent + ' · EPUB Reader';
 
+      // 렌더러는 컨테이너의 실제 크기를 읽으므로 숨김 해제 후 생성합니다.
+      ui.empty.hidden = true;
+      ui.viewer.hidden = false;
       rendition = book.renderTo(ui.viewer, {
         width: '100%',
         height: '100%',
@@ -160,8 +163,6 @@
         ui.status.textContent = page && total ? `섹션 ${page} / ${total}` : ui.title.textContent;
       });
 
-      ui.empty.hidden = true;
-      ui.viewer.hidden = false;
       const saved = await chrome.storage.local.get(key);
       const cfi = saved[key];
       if (typeof cfi === 'string') {
@@ -173,9 +174,21 @@
       ui.prev.disabled = false;
       ui.next.disabled = false;
 
-      const navigation = await book.loaded.navigation;
-      addTocItems(navigation?.toc);
-      ui.tocButton.disabled = ui.tocList.childElementCount === 0;
+      // EPUB 본문 iframe에 포커스가 있을 때도 키보드 페이지 넘김 지원
+      rendition.on('keyup', (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === 'ArrowLeft') void rendition?.prev();
+        if (event.key === 'ArrowRight') void rendition?.next();
+      });
+
+      // 내비게이션 파일이 누락된 책도 열 수 있어야 합니다.
+      try {
+        const navigation = await book.loaded.navigation;
+        addTocItems(navigation?.toc);
+        ui.tocButton.disabled = ui.tocList.childElementCount === 0;
+      } catch (error) {
+        console.warn('EPUB 목차 로딩 실패:', error);
+      }
     } catch (error) {
       console.error('EPUB을 열 수 없습니다:', error);
       resetBook();
