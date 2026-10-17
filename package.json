@@ -1,0 +1,13 @@
+{
+  "name": "browser-toolkit",
+  "private": true,
+  "version": "1.2.0",
+  "description": "Build tooling for the offline EPUB reader in the Chrome extension.",
+  "scripts": {
+    "build:epub": "node scripts/build-epub.mjs"
+  },
+  "devDependencies": {
+    "epubjs": "0.3.93",
+    "jszip": "3.10.2"
+  }
+}
