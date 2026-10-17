@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self' blob:">
+  <title>EPUB Reader · Dev Toolkit</title>
+  <link rel="stylesheet" href="reader.css">
+  <script defer src="libs/jszip.min.js"></script>
+  <script defer src="libs/epub.min.js"></script>
+  <script defer src="reader.js"></script>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand"><strong>EPUB Reader</strong><span class="sub">Dev Toolkit</span></div>
+    <div class="book-title" id="book-title" title="현재 도서">책을 선택하세요</div>
+    <div class="controls">
+      <button type="button" id="toc-button" aria-controls="toc-panel" aria-expanded="false" disabled>목차</button>
+      <button type="button" id="decrease-font" aria-label="글자 줄이기">A−</button>
+      <span id="font-value" aria-live="polite">100%</span>
+      <button type="button" id="increase-font" aria-label="글자 키우기">A+</button>
+      <button type="button" id="theme-button" aria-label="다크 모드 켜기">다크 모드</button>
+      <button type="button" id="choose-file" class="primary">EPUB 열기</button>
+    </div>
+  </header>
+  <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden>
+  <div class="layout">
+    <aside id="toc-panel" class="toc-panel" hidden>
+      <div class="toc-heading"><strong>목차</strong><button id="close-toc" type="button" aria-label="목차 닫기">×</button></div>
+      <nav id="toc-list" aria-label="EPUB 목차"></nav>
+    </aside>
+    <main class="reading-area">
+      <section class="empty-state" id="empty-state">
+        <h1>EPUB 파일을 열어주세요</h1>
+        <p>책은 이 브라우저에서만 처리하며 외부 서버로 전송하지 않습니다.</p>
+        <button type="button" id="open-first-book" class="primary">파일 선택</button>
+        <p class="hint">또는 이 창에 EPUB 파일을 끌어놓으세요.</p>
+      </section>
+      <div id="viewer" aria-label="전자책 본문" hidden></div>
+      <div id="error" class="error" role="alert" hidden></div>
+    </main>
+  </div>
+  <footer class="footer">
+    <button type="button" id="prev-page" disabled aria-label="이전 페이지">← 이전</button>
+    <span id="reading-status" aria-live="polite">EPUB 파일을 선택하세요.</span>
+    <button type="button" id="next-page" disabled aria-label="다음 페이지">다음 →</button>
+  </footer>
+</body>
+</html>
