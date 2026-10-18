@@ -13,6 +13,20 @@ function base64ToUtf8(base64) {
   }
 }
 
+// 선택된 텍스트. 포커스가 같은 출처 iframe(예: EPUB 리더의 epub.js 본문)에 있으면 그 안의 선택을 읽는다.
+function getSelectedText() {
+  const frame = document.activeElement?.tagName === 'IFRAME' ? document.activeElement : null;
+  if (frame) {
+    try {
+      const frameText = frame.contentWindow.getSelection()?.toString().trim();
+      if (frameText) return frameText;
+    } catch {
+      // 다른 출처 iframe의 선택은 읽을 수 없다.
+    }
+  }
+  return window.getSelection().toString().trim();
+}
+
 // 백그라운드 스크립트로부터 메시지를 수신 대기
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "ping") {
@@ -31,7 +45,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     showNotification("✗ " + request.text);
   } else if (request.action === "get_selection_and_process") {
     // 선택된 텍스트 가져오기
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = getSelectedText();
     if (selectedText) {
       // background.js로 선택된 텍스트 전달
       chrome.runtime.sendMessage({
@@ -46,7 +60,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // 비동기 응답을 위해 true 반환
   } else if (request.action === "get_selection_for_mermaid") {
     // 선택된 텍스트 가져오기 (Mermaid용)
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = getSelectedText();
     if (selectedText) {
       // background.js로 선택된 텍스트 전달
       chrome.runtime.sendMessage({
@@ -56,7 +70,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   } else if (request.action === "get_selection_for_translation") {
     // 선택된 텍스트 가져오기 (번역용)
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = getSelectedText();
     if (selectedText) {
       // background.js로 선택된 텍스트 전달
       chrome.runtime.sendMessage({
@@ -66,7 +80,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   } else if (request.action === "get_selection_for_memo") {
     // 선택된 텍스트 가져오기 (메모용)
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = getSelectedText();
     if (selectedText) {
       showMemoModal(selectedText);
     } else {
@@ -96,7 +110,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     
     // 선택된 텍스트 가져오기
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = getSelectedText();
     if (selectedText) {
       chrome.runtime.sendMessage({
         action: "process_mermaid",

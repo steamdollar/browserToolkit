@@ -13,6 +13,9 @@
   <script defer src="modules/pdf/page-tracker.js"></script>
   <script defer src="modules/pdf/viewer.js"></script>
   <script defer src="reader.js"></script>
+  <!-- Extension pages never get content scripts injected; load it directly so the
+       selection shortcuts (translate, Base64, memo) also work on the book text. -->
+  <script defer src="content.js"></script>
 </head>
 <body>
   <header class="toolbar">
