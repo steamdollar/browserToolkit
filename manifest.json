@@ -63,7 +63,7 @@
       "description": "Save selected text as memo"
     },
     "open-epub-reader": {
-      "description": "Open EPUB Reader"
+      "description": "Open EPUB/PDF Reader"
     }
   },
   "web_accessible_resources": [

@@ -33,16 +33,22 @@
     clearLibraryHome: $('clear-library-home'),
     pageNumber: $('page-number'),
     pageTotal: $('page-total'),
-    goPage: $('go-page')
+    pageLabel: $('page-label'),
+    goPage: $('go-page'),
+    pdfViewer: $('pdf-viewer')
   };
 
   const PREFS_KEY = 'epubReaderPrefs';
   const POSITION_PREFIX = 'epubReaderPosition:';
+  const PDF_ZOOM_MIN = 50;
+  const PDF_ZOOM_MAX = 200;
   let book = null;
   let rendition = null;
+  let pdfView = null; // Set while a PDF is open; book/rendition stay null then.
   let currentKey = null;
   let opening = false;
   let fontSize = 100;
+  let pdfZoom = 100;
   let darkMode = false;
   let currentCfi = null;
   let currentBookId = null;
@@ -58,6 +64,23 @@
     const direction = wheelPager(event, performance.now());
     if (direction === 'next') rendition.next().catch(console.error);
     else if (direction === 'prev') rendition.prev().catch(console.error);
+  }
+
+  function goPrev() {
+    if (pdfView) pdfView.prev();
+    else rendition?.prev().catch(console.error);
+  }
+
+  function goNext() {
+    if (pdfView) pdfView.next();
+    else rendition?.next().catch(console.error);
+  }
+
+  function fileFormat(file) {
+    const name = file?.name.toLowerCase() || '';
+    if (name.endsWith('.pdf') || file?.type === 'application/pdf') return 'pdf';
+    if (name.endsWith('.epub') || file?.type === 'application/epub+zip') return 'epub';
+    return null;
   }
 
   function showError(message) {
@@ -91,12 +114,12 @@
     clearError();
     ui.empty.hidden = false;
     ui.title.textContent = '책을 선택하세요';
-    ui.status.textContent = 'EPUB 파일을 선택하세요.';
-    document.title = 'EPUB Reader · Dev Toolkit';
+    ui.status.textContent = 'EPUB 또는 PDF 파일을 선택하세요.';
+    document.title = 'EPUB · PDF Reader · Dev Toolkit';
   }
 
   async function forgetBook(id, title) {
-    if (!window.confirm('“' + title + '”을(를) 최근 목록에서 삭제할까요?\n원본 EPUB 파일은 삭제되지 않습니다.')) return;
+    if (!window.confirm('“' + title + '”을(를) 최근 목록에서 삭제할까요?\n원본 파일은 삭제되지 않습니다.')) return;
     try {
       await window.EpubLibrary.remove(id);
       await chrome.storage.local.remove(POSITION_PREFIX + id);
@@ -133,7 +156,7 @@
     const open = document.createElement('button');
     open.type = 'button';
     open.className = 'library-open';
-    open.title = isLegacy ? '원본 EPUB 파일을 다시 선택해 연결' : '원본 EPUB 파일 열기';
+    open.title = isLegacy ? '원본 EPUB 파일을 다시 선택해 연결' : '원본 파일 열기';
     const title = document.createElement('strong');
     title.textContent = item.title || item.name;
     const detail = document.createElement('small');
@@ -209,7 +232,7 @@
       await openFile(file, { handle: entry.handle, recordId: id });
     } catch (error) {
       console.error('최근 책 열기 실패:', error);
-      showError('원본 EPUB에 접근할 수 없습니다. 파일이 이동·삭제되었거나 권한이 해제되었을 수 있습니다.');
+      showError('원본 파일에 접근할 수 없습니다. 파일이 이동·삭제되었거나 권한이 해제되었을 수 있습니다.');
     }
   }
 
@@ -229,8 +252,8 @@
       const [handle] = await window.showOpenFilePicker({
         multiple: false,
         types: [{
-          description: 'EPUB 전자책',
-          accept: { 'application/epub+zip': ['.epub'] }
+          description: 'EPUB·PDF 문서',
+          accept: { 'application/epub+zip': ['.epub'], 'application/pdf': ['.pdf'] }
         }]
       });
       if (!handle) return;
@@ -266,11 +289,17 @@
   }
 
   async function jumpToPage() {
-    if (!book || !rendition || !locationsReady) return;
-    const total = book.locations.length();
+    const total = pdfView ? pdfView.pageCount
+      : book && rendition && locationsReady ? book.locations.length() : 0;
+    if (!total) return;
     const page = Number(ui.pageNumber.value);
     if (!Number.isSafeInteger(page) || page < 1 || page > total) {
-      showError('1부터 ' + total + '까지의 위치 번호를 입력해주세요.');
+      showError('1부터 ' + total + '까지의 ' + ui.pageLabel.textContent + ' 번호를 입력해주세요.');
+      return;
+    }
+    if (pdfView) {
+      clearError();
+      pdfView.goTo(page);
       return;
     }
     const cfi = book.locations.cfiFromLocation(page - 1);
@@ -336,14 +365,25 @@
     }
   }
 
+  // A−/A+ resize EPUB text, or zoom PDF pages (fixed layout, so there is no text size to change).
   function setFont() {
-    ui.fontValue.textContent = fontSize + '%';
-    if (rendition) rendition.themes.fontSize(fontSize + '%');
+    ui.fontValue.textContent = (pdfView ? pdfZoom : fontSize) + '%';
+    ui.smaller.setAttribute('aria-label', pdfView ? '축소' : '글자 줄이기');
+    ui.larger.setAttribute('aria-label', pdfView ? '확대' : '글자 키우기');
+    if (pdfView) pdfView.setZoom(pdfZoom);
+    else if (rendition) rendition.themes.fontSize(fontSize + '%');
+  }
+
+  function changeSize(step) {
+    if (pdfView) pdfZoom = Math.max(PDF_ZOOM_MIN, Math.min(PDF_ZOOM_MAX, pdfZoom + step));
+    else fontSize = Math.max(70, Math.min(180, fontSize + step));
+    setFont();
+    void savePrefs();
   }
 
   function savePrefs() {
     return chrome.storage.local.set({
-      [PREFS_KEY]: { fontSize, darkMode }
+      [PREFS_KEY]: { fontSize, pdfZoom, darkMode }
     }).catch((error) => console.warn('EPUB 설정 저장 실패:', error));
   }
 
@@ -380,34 +420,119 @@
     }
     ui.viewer.replaceChildren();
     ui.viewer.hidden = true;
+    if (pdfView) {
+      pdfView.destroy();
+      pdfView = null;
+      setFont(); // A−/A+ go back to EPUB text size.
+    }
+    ui.pdfViewer.replaceChildren();
+    ui.pdfViewer.hidden = true;
+    ui.pageLabel.textContent = '위치';
     currentKey = null;
   }
 
-  function addTocItems(items, depth = 0) {
+  // EPUB navigation → the shared TOC shape: { label, target, subitems }.
+  function epubTocItems(items) {
+    return (items || []).map(item => ({
+      label: item.label,
+      target: item.href,
+      subitems: epubTocItems(item.subitems)
+    }));
+  }
+
+  // navigate(target) moves the open document and returns a promise.
+  function addTocItems(items, navigate, depth = 0) {
     for (const item of items || []) {
-      if (item.href) {
+      if (item.target) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'toc-link';
         button.textContent = item.label || '제목 없음';
         button.style.paddingLeft = (10 + depth * 14) + 'px';
         button.addEventListener('click', () => {
-          rendition?.display(item.href).catch(() => showError('해당 목차로 이동할 수 없습니다.'));
+          navigate(item.target).catch(() => showError('해당 목차로 이동할 수 없습니다.'));
           toggleToc(false);
         });
         ui.tocList.appendChild(button);
       }
-      if (item.subitems?.length) addTocItems(item.subitems, depth + 1);
+      if (item.subitems?.length) addTocItems(item.subitems, navigate, depth + 1);
     }
+  }
+
+  // Saves the file handle for "최근 책"; resolves true while this file is still the open one.
+  async function rememberFile(handle, file, title, id, token) {
+    if (handle) {
+      try {
+        await window.EpubLibrary.save(handle, file, title, id);
+      } catch (error) {
+        console.warn('파일 핸들 저장 실패:', error);
+        if (activeToken === token) showError('책은 열렸지만 원본 참조를 저장하지 못했습니다. 저장 공간이나 권한을 확인해주세요.');
+      }
+    } else if (activeToken === token) {
+      showError('이 파일은 이번 탭에서만 열었습니다. 최근 책에 저장하려면 파일 열기 버튼으로 다시 선택해주세요.');
+    }
+    if (activeToken !== token) return false;
+    await refreshRecentBooks();
+    return activeToken === token;
+  }
+
+  // PDF pages have a fixed layout: one vertical column, moved through by native scrolling.
+  async function openPdf(file, key, changed, token) {
+    ui.status.textContent = 'PDF를 여는 중…';
+    const data = new Uint8Array(await file.arrayBuffer());
+    // Saved page numbers are invalid if the original file changed.
+    if (changed) await chrome.storage.local.remove(key).catch(console.warn);
+    const saved = changed ? {} : await chrome.storage.local.get(key);
+    if (activeToken !== token) return false; // Reader was reset while the file was read.
+    ui.empty.hidden = true;
+    ui.pdfViewer.hidden = false;
+    const view = await window.PdfViewer.open({
+      container: ui.pdfViewer,
+      data,
+      zoomPercent: pdfZoom,
+      initialPage: Number.isSafeInteger(saved[key]) ? saved[key] : 1,
+      onPageChange: (page, total) => {
+        if (currentKey !== key) return;
+        ui.pageNumber.value = String(page);
+        ui.status.textContent = '쪽 ' + page + ' / ' + total;
+        chrome.storage.local.set({ [key]: page })
+          .catch((error) => console.warn('PDF 위치 저장 실패:', error));
+      }
+    });
+    if (activeToken !== token) { // Reader was reset (e.g. book removed) while the PDF loaded.
+      view.destroy();
+      return false;
+    }
+    pdfView = view;
+    ui.title.textContent = view.title || file.name;
+    document.title = ui.title.textContent + ' · PDF Reader';
+    ui.pageLabel.textContent = '쪽';
+    ui.pageNumber.max = String(view.pageCount);
+    ui.pageTotal.textContent = '/ ' + view.pageCount;
+    ui.pageNumber.disabled = false;
+    ui.goPage.disabled = false;
+    ui.prev.disabled = false;
+    ui.next.disabled = false;
+    setFont();
+    ui.pdfViewer.focus({ preventScroll: true }); // Arrow/PageDown/Space keys scroll the pages.
+
+    try {
+      addTocItems(await view.getTocItems(), target => view.goToTarget(target));
+      ui.tocButton.disabled = ui.tocList.childElementCount === 0;
+    } catch (error) {
+      console.warn('PDF 목차 로딩 실패:', error);
+    }
+    return true;
   }
 
   async function openFile(file, { handle = null, recordId = null } = {}) {
     if (opening) return;
-    if (!file || (!file.name.toLowerCase().endsWith('.epub') && file.type !== 'application/epub+zip')) {
-      showError('EPUB(.epub) 파일을 선택해주세요.');
+    const format = fileFormat(file);
+    if (!format) {
+      showError('EPUB(.epub) 또는 PDF(.pdf) 파일을 선택해주세요.');
       return;
     }
-    if (typeof ePub !== 'function' || typeof JSZip === 'undefined') {
+    if (format === 'epub' && (typeof ePub !== 'function' || typeof JSZip === 'undefined')) {
       showError('EPUB 라이브러리가 없습니다. npm install && npm run build:epub 후 확장 프로그램을 새로고침하세요.');
       return;
     }
@@ -435,8 +560,17 @@
       const key = POSITION_PREFIX + id;
       currentBookId = id;
       currentKey = key;
-      ui.status.textContent = 'EPUB을 여는 중…';
       ui.title.textContent = file.name;
+
+      if (format === 'pdf') {
+        if (await openPdf(file, key, changed, token)) {
+          void rememberFile(handle, file, ui.title.textContent, id, token)
+            .catch(error => console.error('PDF 후처리 실패:', error));
+        }
+        return;
+      }
+
+      ui.status.textContent = 'EPUB을 여는 중…';
 
       const buffer = await file.arrayBuffer();
       // ePub(buffer) swallows open failures and book.ready never settles; open() rejects instead.
@@ -509,34 +643,28 @@
 
       try {
         const navigation = await book.loaded.navigation;
-        addTocItems(navigation?.toc);
+        addTocItems(epubTocItems(navigation?.toc), href => rendition.display(href));
         ui.tocButton.disabled = ui.tocList.childElementCount === 0;
       } catch (error) {
         console.warn('EPUB 목차 로딩 실패:', error);
       }
 
       const targetBook = book;
-      const title = ui.title.textContent;
-      void (async () => {
-        if (handle) {
-          try {
-            await window.EpubLibrary.save(handle, file, title, id);
-          } catch (error) {
-            console.warn('EPUB 파일 핸들 저장 실패:', error);
-            if (activeToken === token) showError('책은 열렸지만 원본 참조를 저장하지 못했습니다. 저장 공간이나 권한을 확인해주세요.');
-          }
-        } else if (activeToken === token) {
-          showError('이 파일은 이번 탭에서만 열었습니다. 최근 책에 저장하려면 EPUB 열기 버튼으로 다시 선택해주세요.');
-        }
-        if (activeToken !== token || targetBook !== book) return;
-        await refreshRecentBooks();
-        await prepareLocations(targetBook, id, token);
-      })().catch(error => console.error('EPUB 도서 후처리 실패:', error));
+      void rememberFile(handle, file, ui.title.textContent, id, token)
+        .then(current => current && targetBook === book ? prepareLocations(targetBook, id, token) : undefined)
+        .catch(error => console.error('EPUB 도서 후처리 실패:', error));
     } catch (error) {
-      console.error('EPUB을 열 수 없습니다:', error);
+      console.error('파일을 열 수 없습니다:', error);
       showEmptyReader();
-      ui.status.textContent = 'EPUB을 열 수 없습니다.';
-      showError('EPUB 파일을 읽지 못했습니다. 손상된 파일이거나 DRM이 적용된 책일 수 있습니다.');
+      if (format === 'pdf') {
+        ui.status.textContent = 'PDF를 열 수 없습니다.';
+        showError(error?.name === 'PasswordException'
+          ? '암호가 걸린 PDF는 지원하지 않습니다.'
+          : 'PDF 파일을 읽지 못했습니다. 손상된 파일일 수 있습니다.');
+      } else {
+        ui.status.textContent = 'EPUB을 열 수 없습니다.';
+        showError('EPUB 파일을 읽지 못했습니다. 손상된 파일이거나 DRM이 적용된 책일 수 있습니다.');
+      }
     } finally {
       opening = false;
     }
@@ -547,6 +675,8 @@
     const prefs = stored[PREFS_KEY] || {};
     fontSize = Number.isFinite(prefs.fontSize)
       ? Math.max(70, Math.min(180, prefs.fontSize)) : 100;
+    pdfZoom = Number.isFinite(prefs.pdfZoom)
+      ? Math.max(PDF_ZOOM_MIN, Math.min(PDF_ZOOM_MAX, prefs.pdfZoom)) : 100;
     darkMode = prefs.darkMode === true;
     setTheme();
     setFont();
@@ -560,8 +690,8 @@
       ui.input.value = '';
       if (file) void openFile(file); // Fallback is temporary, never saved as Blob.
     });
-    ui.prev.addEventListener('click', () => rendition?.prev().catch(console.error));
-    ui.next.addEventListener('click', () => rendition?.next().catch(console.error));
+    ui.prev.addEventListener('click', goPrev);
+    ui.next.addEventListener('click', goNext);
     // Covers the viewer padding outside the book iframe.
     ui.viewer.addEventListener('wheel', handleWheel, { passive: false });
     ui.tocButton.addEventListener('click', () => toggleToc(ui.tocPanel.hidden));
@@ -575,16 +705,8 @@
         void jumpToPage();
       }
     });
-    ui.smaller.addEventListener('click', () => {
-      fontSize = Math.max(70, fontSize - 10);
-      setFont();
-      void savePrefs();
-    });
-    ui.larger.addEventListener('click', () => {
-      fontSize = Math.min(180, fontSize + 10);
-      setFont();
-      void savePrefs();
-    });
+    ui.smaller.addEventListener('click', () => changeSize(-10));
+    ui.larger.addEventListener('click', () => changeSize(10));
     ui.themeButton.addEventListener('click', () => {
       darkMode = !darkMode;
       setTheme();
@@ -595,12 +717,13 @@
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       // Buttons stay eligible so arrow keys keep working after clicking "다음 →".
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-      if (event.key === 'ArrowLeft' && rendition) {
+      const reading = rendition || pdfView;
+      if (event.key === 'ArrowLeft' && reading) {
         event.preventDefault();
-        void rendition.prev();
-      } else if (event.key === 'ArrowRight' && rendition) {
+        goPrev();
+      } else if (event.key === 'ArrowRight' && reading) {
         event.preventDefault();
-        void rendition.next();
+        goNext();
       } else if (event.key === 'Escape') {
         toggleToc(false);
         toggleLibrary(false);
@@ -634,7 +757,7 @@
             }
           }).catch(error => {
             console.error('EPUB 드롭 실패:', error);
-            showError('파일을 읽지 못했습니다. EPUB 열기 버튼으로 다시 선택해주세요.');
+            showError('파일을 읽지 못했습니다. 파일 열기 버튼으로 다시 선택해주세요.');
           });
       } else if (file) {
         void openFile(file);

@@ -4,17 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self' blob:">
-  <title>EPUB Reader · Dev Toolkit</title>
+  <title>EPUB · PDF Reader · Dev Toolkit</title>
   <link rel="stylesheet" href="reader.css">
   <script defer src="libs/jszip.min.js"></script>
   <script defer src="libs/epub.min.js"></script>
   <script defer src="modules/epub/library.js"></script>
   <script defer src="modules/epub/wheel-pager.js"></script>
+  <script defer src="modules/pdf/page-tracker.js"></script>
+  <script defer src="modules/pdf/viewer.js"></script>
   <script defer src="reader.js"></script>
 </head>
 <body>
   <header class="toolbar">
-    <div class="brand"><strong>EPUB Reader</strong><span class="sub">Dev Toolkit</span></div>
+    <div class="brand"><strong>EPUB · PDF Reader</strong><span class="sub">Dev Toolkit</span></div>
     <div class="book-title" id="book-title" title="현재 도서">책을 선택하세요</div>
     <div class="controls">
       <button type="button" id="library-button" aria-controls="library-panel" aria-expanded="false">최근 책</button>
@@ -23,10 +25,10 @@
       <span id="font-value" aria-live="polite">100%</span>
       <button type="button" id="increase-font" aria-label="글자 키우기">A+</button>
       <button type="button" id="theme-button" aria-label="다크 모드 켜기">다크 모드</button>
-      <button type="button" id="choose-file" class="primary">EPUB 열기</button>
+      <button type="button" id="choose-file" class="primary">파일 열기</button>
     </div>
   </header>
-  <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden>
+  <input type="file" id="file-input" accept=".epub,application/epub+zip,.pdf,application/pdf" hidden>
   <div class="layout">
     <aside id="library-panel" class="toc-panel" hidden>
       <div class="toc-heading"><strong>최근 읽은 책</strong><button id="close-library" type="button" aria-label="최근 책 닫기">×</button></div>
@@ -40,28 +42,29 @@
     </aside>
     <main class="reading-area">
       <section class="empty-state" id="empty-state">
-        <h1>EPUB 파일을 열어주세요</h1>
+        <h1>EPUB 또는 PDF 파일을 열어주세요</h1>
         <p>책은 이 브라우저에서만 처리하며 외부 서버로 전송하지 않습니다.</p>
         <button type="button" id="open-first-book" class="primary">파일 선택</button>
-        <p class="hint">EPUB 파일을 끌어놓을 수도 있습니다. 핸들 지원 여부에 따라 일시적으로만 열릴 수 있습니다.</p>
+        <p class="hint">파일을 끌어놓을 수도 있습니다. 핸들 지원 여부에 따라 일시적으로만 열릴 수 있습니다.</p>
         <section id="recent-home" class="recent-home" hidden>
           <div class="recent-heading"><h2>최근 읽은 책</h2><button type="button" id="clear-library-home" class="danger" disabled>전체 삭제</button></div>
           <div id="recent-home-list" class="library-list"></div>
         </section>
       </section>
       <div id="viewer" aria-label="전자책 본문" hidden></div>
+      <div id="pdf-viewer" class="pdf-viewer" tabindex="0" aria-label="PDF 본문" hidden></div>
       <div id="error" class="error" role="alert" hidden></div>
     </main>
   </div>
   <footer class="footer">
     <button type="button" id="prev-page" disabled aria-label="이전 페이지">← 이전</button>
     <div class="page-jump">
-      <label for="page-number">위치</label>
+      <label for="page-number" id="page-label">위치</label>
       <input id="page-number" type="number" min="1" step="1" placeholder="쪽" aria-label="이동할 책 위치" disabled>
       <span id="page-total">/ —</span>
       <button type="button" id="go-page" disabled>이동</button>
     </div>
-    <span id="reading-status" aria-live="polite">EPUB 파일을 선택하세요.</span>
+    <span id="reading-status" aria-live="polite">EPUB 또는 PDF 파일을 선택하세요.</span>
     <button type="button" id="next-page" disabled aria-label="다음 페이지">다음 →</button>
   </footer>
 </body>

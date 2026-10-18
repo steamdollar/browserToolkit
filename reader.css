@@ -74,12 +74,37 @@ button.danger { color: var(--alert-ink); border-color: var(--alert-ink); backgro
 .page-jump label, #page-total { color: var(--muted); font-size: 12px; }
 #page-number { width: 75px; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 7px; font: inherit; }
 #page-number:disabled { opacity: .5; }
+/* PDF: fixed-size pages in one vertical column; native scrolling moves between pages.
+   overflow-anchor is off because viewer.js restores the scroll position itself on resize.
+   scrollbar-gutter keeps the width fixed, else a short PDF toggles its scrollbar ↔ fit width forever. */
+.pdf-viewer { position: relative; height: 100%; overflow: auto; overflow-anchor: none; scrollbar-gutter: stable; padding: 16px; outline: none; }
+.pdf-page { position: relative; margin: 0 auto 16px; background: #fff; box-shadow: 0 1px 4px #0003; --scale-round-x: 1px; --scale-round-y: 1px; }
+.pdf-page canvas { display: block; width: 100%; height: 100%; }
+/* pdf.js text layer, trimmed from pdfjs-dist web/pdf_viewer.css: transparent text over the canvas for selection/copy. */
+.textLayer { position: absolute; inset: 0; overflow: clip; text-align: initial; opacity: 1; line-height: 1; letter-spacing: normal; word-spacing: normal; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 0;
+  --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv: calc(1 / var(--min-font-size)); }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; user-select: text; }
+.textLayer > :not(.markedContent), .textLayer .markedContent span:not(.markedContent) { z-index: 1; --font-height: 0; font-size: calc(var(--text-scale-factor) * var(--font-height)); --scale-x: 1; --rotate: 0deg; transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.textLayer .markedContent { display: contents; }
+.textLayer span[role="img"] { user-select: none; cursor: default; }
+.textLayer ::selection { background: color-mix(in srgb, AccentColor, transparent 50%); color: transparent; }
+.textLayer br::selection { background: transparent; }
+.textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.textLayer.selecting .endOfContent { top: 0; }
+.textLayer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.textLayer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.textLayer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
+/* Dark mode inverts the rendered page; hue-rotate keeps colors close to the original hue. */
+:root[data-theme="dark"] .pdf-page { background: #1f1f1f; }
+:root[data-theme="dark"] .pdf-page canvas { filter: invert(.88) hue-rotate(180deg); }
 body.drop-target .reading-area { outline: 3px dashed var(--accent); outline-offset: -8px; }
 @media (max-width: 700px) {
   .toolbar { padding: 10px; gap: 10px; }
   .book-title { order: 3; flex-basis: 100%; }
   .controls { margin-left: auto; }
   #viewer { padding: 10px 8px; }
+  .pdf-viewer { padding: 8px; }
+  .pdf-page { margin-bottom: 8px; }
   .toc-panel { position: absolute; z-index: 4; top: 0; bottom: 0; box-shadow: 7px 0 22px #0002; }
   .footer { padding: 8px; flex-wrap: wrap; }
   #reading-status { order: 3; width: 100%; }

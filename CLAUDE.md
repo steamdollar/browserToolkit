@@ -43,7 +43,8 @@ content.js (웹 페이지 상호작용)
 - `modules/mermaid/` - Mermaid.js SVG 렌더링
 - `modules/settings.js` - Chrome Storage 관리 (SettingsManager 클래스)
 - `libs/mermaid.min.js` - Mermaid 라이브러리 (번들 포함)
-- `libs/epub.min.js`, `libs/jszip.min.js` - EPUB 리더용 (번들 포함, 갱신: `npm run build:epub`)
+- `modules/epub/`, `modules/pdf/` - `reader.html` 리더 탭의 EPUB/PDF 모듈 (classic script, `window.*` 전역)
+- `libs/epub.min.js`, `libs/jszip.min.js`, `libs/pdfjs/` - EPUB/PDF 리더용 (번들 포함, 갱신: `npm run build:epub`)
 
 **스토리지:**
 - Chrome Storage API 사용 (sync: 설정, local: 메모)
@@ -70,7 +71,7 @@ content.js (웹 페이지 상호작용)
 | Base64 디코딩 | `Alt+Shift+D` |
 | Mermaid 오버레이 | `Alt+Q` |
 | 페이지 메모 저장 | `Alt+Shift+S` |
-| EPUB 리더 열기 | 기본키 없음 (직접 지정, 권장 `Alt+Shift+E`) |
+| EPUB/PDF 리더 열기 | 기본키 없음 (직접 지정, 권장 `Alt+Shift+E`) |
 | 팝업 폼 저장 | `Ctrl+S` |
 | 팝업 내 실행 | `Ctrl+Enter` |
 
